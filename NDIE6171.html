@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NDIE 6171 - Nampilin Detail Wilkerstat Ekspress</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f7fc;
+    }
+    header, footer {
+      background-color: #5e3a87;
+      color: white;
+      padding: 1em;
+      text-align: center;
+      background-image: radial-gradient(circle at top left, rgba(255,255,255,0.1), transparent 70%), radial-gradient(circle at bottom right, rgba(255,255,255,0.05), transparent 70%);
+    }
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
+    .search-container {
+      text-align: center;
+      margin: 1em auto;
+    }
+    input[type="text"] {
+      padding: 0.5em;
+      width: 250px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 0.5em 1em;
+      background-color: #5e3a87;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 0.5em;
+    }
+    button:hover {
+      background-color: #7a4bb5;
+    }
+    .info {
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NDIE 6171 - Nampilin Detail Wilkerstat Ekspress</h1>
+  </header>
+
+  <div class="search-container">
+    <input type="text" id="searchInput" placeholder="Cari berdasarkan ID SLS...">
+    <button onclick="searchFeature()">Cari</button>
+  </div>
+
+  <div id="map"></div>
+
+  <footer>
+    <p>&copy; 2025 NDIE 6171 | @yoviewibowo</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([-0.0263, 109.3425], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let geojsonLayer;
+    let currentHighlighted;
+
+    function highlightFeature(layer) {
+      if (currentHighlighted) {
+        geojsonLayer.resetStyle(currentHighlighted);
+      }
+      currentHighlighted = layer;
+      layer.setStyle({
+        color: 'green',
+        weight: 3,
+        fillOpacity: 0.7
+      });
+      map.fitBounds(layer.getBounds());
+    }
+
+    function onEachFeature(feature, layer) {
+      const props = feature.properties;
+      if (props && props.nmsls) {
+        const popupContent = `
+          <div class="info">
+            <strong>RT/RW:</strong> ${props.nmsls}<br>
+            <strong>Kelurahan:</strong> ${props.nmdesa}<br>
+            <strong>Kecamatan:</strong> ${props.nmkec}<br>
+            <strong>IDSLS:</strong> ${props.idsls}
+          </div>
+        `;
+        layer.bindPopup(popupContent);
+
+        layer.on('mouseover', function () {
+          layer.setStyle({
+            color: 'orange',
+            weight: 2,
+            fillOpacity: 0.5
+          });
+        });
+
+        layer.on('mouseout', function () {
+          geojsonLayer.resetStyle(layer);
+        });
+
+        layer.on('click', function () {
+          layer.openPopup();
+        });
+      }
+    }
+
+    const geojsonUrl = 'https://raw.githubusercontent.com/yoviewibowo/ndie6171/main/final_sls_202416171.geojson';
+
+    fetch(geojsonUrl)
+      .then(response => {
+        if (!response.ok) throw new Error('HTTP status ' + response.status);
+        return response.json();
+      })
+      .then(data => {
+        geojsonLayer = L.geoJSON(data, {
+          style: {
+            color: '#5e3a87',
+            weight: 1,
+            fillOpacity: 0.2
+          },
+          onEachFeature: onEachFeature
+        }).addTo(map);
+        window.geojsonData = data;
+      })
+      .catch(error => {
+        console.error('Gagal memuat GeoJSON:', error);
+        alert('Gagal memuat GeoJSON dari GitHub.');
+      });
+
+    function searchFeature() {
+      const input = document.getElementById('searchInput').value.trim().toLowerCase();
+      if (!input || !window.geojsonData) return;
+
+      const features = window.geojsonData.features;
+      const match = features.find(f => f.properties.idsls.toLowerCase() === input);
+
+      if (match) {
+        const layer = L.geoJSON(match);
+        highlightFeature(layer.getLayers()[0]);
+        layer.addTo(map);
+        setTimeout(() => map.removeLayer(layer), 1000);
+      } else {
+        alert('ID SLS tidak ditemukan.');
+      }
+    }
+  </script>
+</body>
+</html>
