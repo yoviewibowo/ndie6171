@@ -147,21 +147,23 @@
       });
 
     function searchFeature() {
-      const input = document.getElementById('searchInput').value.trim().toLowerCase();
-      if (!input || !window.geojsonData) return;
+  const input = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!input || !window.geojsonData || !geojsonLayer) return;
 
-      const features = window.geojsonData.features;
-      const match = features.find(f => f.properties.idsls.toLowerCase() === input);
-
-      if (match) {
-        const layer = L.geoJSON(match);
-        highlightFeature(layer.getLayers()[0]);
-        layer.addTo(map);
-        setTimeout(() => map.removeLayer(layer), 1000);
-      } else {
-        alert('ID SLS tidak ditemukan.');
-      }
+  let found = false;
+  geojsonLayer.eachLayer(layer => {
+    const props = layer.feature.properties;
+    if (props.idsls.toLowerCase() === input) {
+      highlightFeature(layer);
+      layer.openPopup();
+      found = true;
     }
+  });
+
+  if (!found) {
+    alert('ID SLS tidak ditemukan.');
+  }
+}
   </script>
 </body>
 </html>
