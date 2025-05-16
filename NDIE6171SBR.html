@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NDIE 6171 - Nampilin Detail Wilkerstat Ekspress</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f7fc;
+    }
+    header, footer {
+      background-color: #5e3a87;
+      color: white;
+      padding: 1em;
+      text-align: center;
+      background-image: radial-gradient(circle at top left, rgba(255,255,255,0.1), transparent 70%), radial-gradient(circle at bottom right, rgba(255,255,255,0.05), transparent 70%);
+    }
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
+    .search-container {
+      text-align: center;
+      margin: 1em auto;
+    }
+    input[type="text"] {
+      padding: 0.5em;
+      width: 250px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 0.5em 1em;
+      background-color: #5e3a87;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 0.5em;
+    }
+    button:hover {
+      background-color: #7a4bb5;
+    }
+    .info {
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    #legend {
+      position: absolute;
+      bottom: 90px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      font-size: 0.9em;
+    }
+    #legend i {
+      width: 12px;
+      height: 12px;
+      display: inline-block;
+      margin-right: 5px;
+      border-radius: 50%;
+    }
+    #loading {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NDIE 6171 - Nampilin Detail Wilkerstat Ekspress</h1>
+  </header>
+
+  <div class="search-container">
+    <input type="text" id="searchInput" placeholder="Cari berdasarkan ID SLS...">
+    <button onclick="searchFeature()">Cari</button>
+  </div>
+
+  <div id="map"></div>
+  <div id="legend" class="info">
+  <strong>Legenda & Filter Infrastruktur:</strong><br>
+  <label><input type="checkbox" value="KELOMPOK PERTOKOAN" checked onchange="toggleInfra(this)"> <i style="background:#e41a1c;"></i> KELOMPOK PERTOKOAN</label><br>
+  <label><input type="checkbox" value="PASAR BGN PERMANEN" checked onchange="toggleInfra(this)"> <i style="background:#377eb8;"></i> PASAR BGN PERMANEN</label><br>
+  <label><input type="checkbox" value="PASAR BGN SEMI PERMANEN" checked onchange="toggleInfra(this)"> <i style="background:#4daf4a;"></i> PASAR BGN SEMI PERMANEN</label><br>
+  <label><input type="checkbox" value="PASAR TANPA BGN" checked onchange="toggleInfra(this)"> <i style="background:#984ea3;"></i> PASAR TANPA BGN</label><br>
+  <label><input type="checkbox" value="MINIMARKET/SWALAYAN/SUPERMARKET" checked onchange="toggleInfra(this)"> <i style="background:#ff7f00;"></i> MINIMARKET/SWALAYAN/SUPERMARKET</label><br>
+  <label><input type="checkbox" value="HOTEL" checked onchange="toggleInfra(this)"> <i style="background:#bb7c00;"></i> HOTEL</label>
+  </div>
+  <div id="loading">Loading data...</div>
+
+  <footer>
+    <p>&copy; 2025 NDIE 6171 | @yoviewibowo</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([-0.0263, 109.3425], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let geojsonLayer;
+    let currentHighlighted;
+	let allInfraLayers = []; // Simpan semua marker di sini untuk filtering
+	let infraLayerGroup = L.layerGroup().addTo(map);
+
+    function highlightFeature(layer) {
+      if (currentHighlighted) {
+        geojsonLayer.resetStyle(currentHighlighted);
+      }
+      currentHighlighted = layer;
+      layer.setStyle({
+        color: 'green',
+        weight: 3,
+        fillOpacity: 0.7
+      });
+      map.fitBounds(layer.getBounds());
+    }
+
+    function onEachFeature(feature, layer) {
+      const props = feature.properties;
+      if (props && props.nmsls) {
+        const popupContent = `
+          <div class="info">
+            <strong>RT/RW:</strong> ${props.nmsls}<br>
+            <strong>Kelurahan:</strong> ${props.nmdesa}<br>
+            <strong>Kecamatan:</strong> ${props.nmkec}<br>
+            <strong>IDSLS:</strong> ${props.idsls}
+          </div>
+        `;
+        layer.bindPopup(popupContent);
+
+        layer.on('mouseover', () => {
+          layer.setStyle({
+            color: 'orange',
+            weight: 2,
+            fillOpacity: 0.5
+          });
+        });
+
+        layer.on('mouseout', () => {
+          geojsonLayer.resetStyle(layer);
+        });
+
+        layer.on('click', () => {
+          layer.openPopup();
+        });
+      }
+    }
+
+    function getInfraColor(jenis) {
+      switch (jenis.toLowerCase()) {
+        case 'kelompok pertokoan': return '#e41a1c';
+        case 'pasar bgn permanen': return '#377eb8';
+        case 'pasar bgn semi permanen': return '#4daf4a';
+        case 'pasar tanpa bgn': return '#984ea3';
+        case 'minimarket/swalayan/supermarket': return '#ff7f00';
+        case 'hotel' : return '#bb7c00';
+        default: return '#999999';
+      }
+    }
+
+    function onEachInfraFeature(feature, layer) {
+      const props = feature.properties;
+      const nama = props.nama_infrastruktur || 'Tidak diketahui';
+      const jenis = props.jenis_infrastruktur || 'Tidak diketahui';
+      const popupContent = `
+        <div class="info">
+          <strong>Nama:</strong> ${nama}<br>
+          <strong>Jenis:</strong> ${jenis}
+        </div>
+      `;
+      layer.bindPopup(popupContent);
+      layer.on('click', function() {
+        this.bringToFront(); // pastikan tetap di atas
+        this.openPopup();
+      });
+    }
+	
+	function toggleInfra(checkbox) {
+  const jenis = checkbox.value.toLowerCase();
+  const show = checkbox.checked;
+
+  allInfraLayers.forEach(marker => {
+    const markerJenis = (marker.feature.properties.jenis_infrastruktur || '').toLowerCase();
+    if (markerJenis === jenis) {
+      if (show) {
+        marker.addTo(infraLayerGroup);
+      } else {
+        infraLayerGroup.removeLayer(marker);
+      }
+    }
+  });
+}
+
+    const geojsonInfraUrl = 'https://raw.githubusercontent.com/yoviewibowo/ndie6171/main/tes_infrastruktur.geojson';
+    const geojsonUrl = 'https://raw.githubusercontent.com/yoviewibowo/ndie6171/main/final_sls_202416171.geojson';
+
+    document.getElementById('loading').style.display = 'block';
+
+    fetch(geojsonUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP status ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        geojsonLayer = L.geoJSON(data, {
+          style: {
+            color: '#5e3a87',
+            weight: 1,
+            fillOpacity: 0.2
+          },
+          onEachFeature: onEachFeature
+        }).addTo(map);
+
+        window.geojsonData = data;
+
+        // Setelah layer SLS dimuat, lanjutkan ke infrastruktur
+        return fetch(geojsonInfraUrl);
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP status ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+  allInfraLayers = data.features.map(feature => {
+    const jenis = feature.properties.jenis_infrastruktur || '';
+    const color = getInfraColor(jenis);
+    const marker = L.circleMarker([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], {
+      radius: 7,
+      fillColor: color,
+      color: '#333',
+      weight: 1,
+      opacity: 1,
+      fillOpacity: 0.8
+    });
+
+    marker.feature = feature;
+    onEachInfraFeature(feature, marker);
+    return marker;
+  });
+
+  allInfraLayers.forEach(marker => marker.addTo(infraLayerGroup));
+
+  document.getElementById('loading').style.display = 'none';
+})
+      .catch(err => {
+        console.error('Gagal memuat data:', err);
+        document.getElementById('loading').style.display = 'none';
+        alert('Gagal memuat data dari GitHub.');
+      });
+
+    function searchFeature() {
+      const input = document.getElementById('searchInput').value.trim().toLowerCase();
+      if (!input || !window.geojsonData || !geojsonLayer) return;
+
+      let found = false;
+      geojsonLayer.eachLayer(layer => {
+        const props = layer.feature.properties;
+        if (props.idsls.toLowerCase() === input) {
+          highlightFeature(layer);
+          layer.openPopup();
+          found = true;
+        }
+      });
+
+      if (!found) {
+        alert('ID SLS tidak ditemukan.');
+      }
+    }
+  </script>
+</body>
+</html>
