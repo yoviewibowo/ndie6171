@@ -1,16 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NDIE 6171 - Nampilin Detail Wilkerstat Ekspress</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="NDIE 6171 adalah aplikasi pemetaan interaktif berbasis web untuk menampilkan detail wilayah kerja statistik (SLS) secara cepat dan akurat.">
+  <meta name="keywords" content="NDIE, Wilkerstat, SLS, Statistik, BPS, Pemetaan, GeoJSON, Leaflet, Pontianak">
+  <meta name="author" content="Yovie Wibowo">
+
+  <!-- Open Graph Meta (untuk sosial media preview) -->
+  <meta property="og:title" content="NDIE 6171 - Nampilin Detail Wilkerstat Ekspress">
+  <meta property="og:description" content="Tampilkan detail wilayah kerja statistik (SLS) dengan cepat menggunakan peta interaktif NDIE 6171.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://yoviewibowo.github.io/ndie6171">
+  <meta property="og:image" content="https://yoviewibowo.github.io/ndie6171/assets/preview.jpg">
+
+  <!-- Favicon -->
+  <link rel="icon" href="https://yoviewibowo.github.io/ndie6171/assets/favicon.png" type="image/png">
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Turf.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
   <style>
     body {
       margin: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #f8f7fc;
     }
+
     header, footer {
       background-color: #5e3a87;
       color: white;
@@ -18,37 +39,56 @@
       text-align: center;
       background-image: radial-gradient(circle at top left, rgba(255,255,255,0.1), transparent 70%), radial-gradient(circle at bottom right, rgba(255,255,255,0.05), transparent 70%);
     }
-    #map {
-      height: 80vh;
-      width: 100%;
-    }
+
     .search-container {
       text-align: center;
-      margin: 1em auto;
+      margin: 1.5em auto;
     }
-    input[type="text"] {
+
+    .search-container input[type="text"] {
       padding: 0.5em;
-      width: 250px;
+      margin: 0.5em 0.25em;
+      width: 220px;
+      max-width: 80%;
       border: 1px solid #ccc;
       border-radius: 5px;
     }
-    button {
-      padding: 0.5em 1em;
+
+    .search-container button {
+      padding: 0.6em 1.2em;
       background-color: #5e3a87;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      margin-left: 0.5em;
+      margin: 0.25em;
     }
-    button:hover {
+
+    .search-container button:hover {
       background-color: #7a4bb5;
     }
+
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
+
     .info {
       background: white;
       padding: 10px;
       border-radius: 5px;
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+
+    @media screen and (max-width: 600px) {
+      .search-container input[type="text"] {
+        width: 90%;
+      }
+
+      .search-container button {
+        width: 90%;
+        margin-top: 0.5em;
+      }
     }
   </style>
 </head>
@@ -60,6 +100,10 @@
   <div class="search-container">
     <input type="text" id="searchInput" placeholder="Cari berdasarkan ID SLS...">
     <button onclick="searchFeature()">Cari</button>
+    <br>
+    <input type="text" id="latInput" placeholder="Latitude...">
+    <input type="text" id="lngInput" placeholder="Longitude...">
+    <button onclick="searchByLatLng()">Cari Koordinat</button>
   </div>
 
   <div id="map"></div>
@@ -78,6 +122,7 @@
 
     let geojsonLayer;
     let currentHighlighted;
+    let markerLatLng;
 
     function highlightFeature(layer) {
       if (currentHighlighted) {
@@ -104,51 +149,37 @@
           </div>
         `;
         layer.bindPopup(popupContent);
-
-        layer.on('mouseover', function () {
-          layer.setStyle({
-            color: 'orange',
-            weight: 2,
-            fillOpacity: 0.5
-          });
-        });
-
-        layer.on('mouseout', function () {
-          geojsonLayer.resetStyle(layer);
-        });
-
-        layer.on('click', function () {
-          layer.openPopup();
-        });
+        layer.on('mouseover', () => layer.setStyle({ color: 'orange', weight: 2, fillOpacity: 0.5 }));
+        layer.on('mouseout', () => geojsonLayer.resetStyle(layer));
+        layer.on('click', () => layer.openPopup());
       }
     }
 
     const geojsonUrl = 'https://raw.githubusercontent.com/yoviewibowo/ndie6171/main/final_sls_202416171.geojson';
 
     fetch(geojsonUrl)
-      .then(response => {
-        if (!response.ok) throw new Error('HTTP status ' + response.status);
-        return response.json();
-      })
+      .then(res => res.json())
       .then(data => {
         geojsonLayer = L.geoJSON(data, {
-          style: {
+          style: feature => ({
             color: '#5e3a87',
             weight: 1,
             fillOpacity: 0.2
-          },
+          }),
           onEachFeature: onEachFeature
         }).addTo(map);
         window.geojsonData = data;
+
+        
       })
-      .catch(error => {
-        console.error('Gagal memuat GeoJSON:', error);
-        alert('Gagal memuat GeoJSON dari GitHub.');
+      .catch(err => {
+        console.error('Gagal memuat GeoJSON:', err);
+        alert('Gagal memuat data wilayah.');
       });
 
     function searchFeature() {
   const input = document.getElementById('searchInput').value.trim().toLowerCase();
-  if (!input || !window.geojsonData || !geojsonLayer) return;
+  if (!input || !geojsonLayer) return;
 
   let found = false;
   geojsonLayer.eachLayer(layer => {
@@ -156,14 +187,62 @@
     if (props.idsls.toLowerCase() === input) {
       highlightFeature(layer);
       layer.openPopup();
+      map.flyTo(layer.getBounds().getCenter(), 17, { duration: 1.5 }); 
       found = true;
     }
   });
 
-  if (!found) {
-    alert('ID SLS tidak ditemukan.');
-  }
+  if (!found) alert('ID SLS tidak ditemukan.');
 }
+
+    function searchByLatLng() {
+      const lat = parseFloat(document.getElementById('latInput').value.trim());
+      const lng = parseFloat(document.getElementById('lngInput').value.trim());
+
+      if (isNaN(lat) || isNaN(lng)) {
+        alert("Format Latitude Longitudenya Salah Gaes. Pake pemisal (.) ya");
+        return;
+      }
+
+      const point = turf.point([lng, lat]);
+      let matchedFeature = null;
+      let matchedLayer = null;
+
+      geojsonLayer.eachLayer(layer => {
+        const polygon = layer.feature;
+        if (turf.booleanPointInPolygon(point, polygon)) {
+          matchedFeature = polygon.properties;
+          matchedLayer = layer;
+        }
+      });
+
+      if (markerLatLng) map.removeLayer(markerLatLng);
+
+      let popupContent = `
+        <div class="info">
+          <strong>Latitude:</strong> ${lat}<br>
+          <strong>Longitude:</strong> ${lng}<br><hr>
+      `;
+
+      if (matchedFeature) {
+        popupContent += `
+          <strong>RT/RW:</strong> ${matchedFeature.nmsls}<br>
+          <strong>Kelurahan:</strong> ${matchedFeature.nmdesa}<br>
+          <strong>Kecamatan:</strong> ${matchedFeature.nmkec}<br>
+          <strong>IDSLS:</strong> ${matchedFeature.idsls}
+        `;
+      } else {
+        popupContent += `<em>Lokasi tidak berada di dalam Wilkerstat Kota Pontianak.</em>`;
+      }
+
+      popupContent += `</div>`;
+
+      markerLatLng = L.marker([lat, lng]).addTo(map).bindPopup(popupContent).openPopup();
+
+      if (matchedLayer) highlightFeature(matchedLayer);
+
+      map.flyTo([lat, lng], 17, { duration: 1.5 });
+    }
   </script>
 </body>
 </html>
