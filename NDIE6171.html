@@ -80,6 +80,50 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
     }
 
+    /* Legenda styling */
+    .legend {
+      background: white;
+      padding: 8px 12px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      font-size: 14px;
+      line-height: 1.4em;
+      max-width: 200px;
+    }
+
+    .legend-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+      text-align: center;
+      color: #5e3a87;
+    }
+
+    .legend-item {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+      user-select: none;
+    }
+
+    .legend-color-box {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+      border-radius: 3px;
+      border: 1px solid #ccc;
+      flex-shrink: 0;
+    }
+
+    .legend-item.disabled .legend-color-box {
+      opacity: 0.3;
+      border-color: #999;
+    }
+
+    .legend-item.disabled {
+      color: #999;
+    }
+
     @media screen and (max-width: 600px) {
       .search-container input[type="text"] {
         width: 90%;
@@ -104,6 +148,7 @@
     <input type="text" id="latInput" placeholder="Latitude...">
     <input type="text" id="lngInput" placeholder="Longitude...">
     <button onclick="searchByLatLng()">Cari Koordinat</button>
+    <button onclick="resetSearch()">Reset</button>
   </div>
 
   <div id="map"></div>
@@ -124,6 +169,19 @@
     let currentHighlighted;
     let markerLatLng;
 
+    const colorsByKecamatan = {
+      'PONTIANAK SELATAN': '#ec7063', 
+      'PONTIANAK TENGGARA': '#bb8fce',
+      'PONTIANAK TIMUR': '#5dade2',
+      'PONTIANAK BARAT': '#45b39d',
+      'PONTIANAK KOTA': '#eb984e',
+      'PONTIANAK UTARA':'#5d6d7e'
+      
+    };
+
+    
+    const activeKecamatan = {};
+
     function highlightFeature(layer) {
       if (currentHighlighted) {
         geojsonLayer.resetStyle(currentHighlighted);
@@ -135,6 +193,21 @@
         fillOpacity: 0.7
       });
       map.fitBounds(layer.getBounds());
+    }
+
+    function resetSearch() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('latInput').value = '';
+      document.getElementById('lngInput').value = '';
+      if (currentHighlighted) {
+        geojsonLayer.resetStyle(currentHighlighted);
+        currentHighlighted = null;
+      }
+      if (markerLatLng) {
+        map.removeLayer(markerLatLng);
+        markerLatLng = null;
+      }
+      map.setView([-0.0263, 109.3425], 13);
     }
 
     function onEachFeature(feature, layer) {
@@ -150,9 +223,25 @@
         `;
         layer.bindPopup(popupContent);
         layer.on('mouseover', () => layer.setStyle({ color: 'orange', weight: 2, fillOpacity: 0.5 }));
-        layer.on('mouseout', () => geojsonLayer.resetStyle(layer));
+        layer.on('mouseout', () => {
+          if (layer !== currentHighlighted) {
+            geojsonLayer.resetStyle(layer);
+          }
+        });
         layer.on('click', () => layer.openPopup());
       }
+    }
+
+    function getPolygonStyle(feature) {
+      const kec = feature.properties.nmkec;
+      const color = colorsByKecamatan[kec] || '#999999'; 
+      const isActive = activeKecamatan[kec] !== false; 
+      return {
+        color: color,
+        weight: 2,
+        fillOpacity: isActive ? 0.3 : 0,
+        opacity: isActive ? 1 : 0
+      };
     }
 
     const geojsonUrl = 'https://raw.githubusercontent.com/yoviewibowo/ndie6171/main/final_sls_202416171.geojson';
@@ -160,17 +249,18 @@
     fetch(geojsonUrl)
       .then(res => res.json())
       .then(data => {
+        data.features.forEach(f => {
+          const kec = f.properties.nmkec;
+          if (!(kec in activeKecamatan)) activeKecamatan[kec] = true;
+        });
+
         geojsonLayer = L.geoJSON(data, {
-          style: feature => ({
-            color: '#5e3a87',
-            weight: 1,
-            fillOpacity: 0.2
-          }),
+          style: getPolygonStyle,
           onEachFeature: onEachFeature
         }).addTo(map);
         window.geojsonData = data;
 
-        
+        addLegend();
       })
       .catch(err => {
         console.error('Gagal memuat GeoJSON:', err);
@@ -178,22 +268,22 @@
       });
 
     function searchFeature() {
-  const input = document.getElementById('searchInput').value.trim().toLowerCase();
-  if (!input || !geojsonLayer) return;
+      const input = document.getElementById('searchInput').value.trim().toLowerCase();
+      if (!input || !geojsonLayer) return;
 
-  let found = false;
-  geojsonLayer.eachLayer(layer => {
-    const props = layer.feature.properties;
-    if (props.idsls.toLowerCase() === input) {
-      highlightFeature(layer);
-      layer.openPopup();
-      map.flyTo(layer.getBounds().getCenter(), 17, { duration: 1.5 }); 
-      found = true;
+      let found = false;
+      geojsonLayer.eachLayer(layer => {
+        const props = layer.feature.properties;
+        if (props.idsls.toLowerCase() === input) {
+          highlightFeature(layer);
+          layer.openPopup();
+          map.flyTo(layer.getBounds().getCenter(), 17, { duration: 1.5 });
+          found = true;
+        }
+      });
+
+      if (!found) alert('ID SLS tidak ditemukan.');
     }
-  });
-
-  if (!found) alert('ID SLS tidak ditemukan.');
-}
 
     function searchByLatLng() {
       const lat = parseFloat(document.getElementById('latInput').value.trim());
@@ -243,6 +333,42 @@
 
       map.flyTo([lat, lng], 17, { duration: 1.5 });
     }
+
+    function addLegend() {
+      const legend = L.control({ position: 'bottomright' });
+
+      legend.onAdd = function () {
+        const div = L.DomUtil.create('div', 'legend');
+        div.innerHTML = '<div class="legend-title">Legenda Kecamatan</div>';
+
+        for (const [kec, color] of Object.entries(colorsByKecamatan)) {
+          const active = activeKecamatan[kec];
+          const item = document.createElement('div');
+          item.className = 'legend-item' + (active ? '' : ' disabled');
+          item.innerHTML = `
+            <div class="legend-color-box" style="background:${color}"></div>${kec}
+          `;
+          item.onclick = () => {
+            activeKecamatan[kec] = !activeKecamatan[kec];
+            item.classList.toggle('disabled');
+            updatePolygonStyles();
+          };
+          div.appendChild(item);
+        }
+
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+
+      legend.addTo(map);
+    }
+
+    function updatePolygonStyles() {
+      geojsonLayer.eachLayer(layer => {
+        geojsonLayer.resetStyle(layer);
+      });
+    }
+
   </script>
 </body>
 </html>
