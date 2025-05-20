@@ -145,9 +145,8 @@
     <input type="text" id="searchInput" placeholder="Cari berdasarkan ID SLS...">
     <button onclick="searchFeature()">Cari</button>
     <br>
-    <input type="text" id="latInput" placeholder="Latitude...">
-    <input type="text" id="lngInput" placeholder="Longitude...">
-    <button onclick="searchByLatLng()">Cari Koordinat</button>
+   <input type="text" id="koordinatInput" placeholder="Lat,Lng contoh: -0.0263,109.3425">
+   <button onclick="searchByKoordinat()">Cari Koordinat</button>
     <button onclick="resetSearch()">Reset</button>
   </div>
 
@@ -197,8 +196,7 @@
 
     function resetSearch() {
       document.getElementById('searchInput').value = '';
-      document.getElementById('latInput').value = '';
-      document.getElementById('lngInput').value = '';
+      document.getElementById('koordinatInput').value = '';
       if (currentHighlighted) {
         geojsonLayer.resetStyle(currentHighlighted);
         currentHighlighted = null;
@@ -285,54 +283,57 @@
       if (!found) alert('ID SLS tidak ditemukan.');
     }
 
-    function searchByLatLng() {
-      const lat = parseFloat(document.getElementById('latInput').value.trim());
-      const lng = parseFloat(document.getElementById('lngInput').value.trim());
+    function searchByKoordinat() {
+  const input = document.getElementById('koordinatInput').value.trim();
+  const [latStr, lngStr] = input.split(',');
 
-      if (isNaN(lat) || isNaN(lng)) {
-        alert("Format Latitude Longitudenya Salah Gaes. Pake pemisal (.) ya");
-        return;
-      }
+  const lat = parseFloat(latStr);
+  const lng = parseFloat(lngStr);
 
-      const point = turf.point([lng, lat]);
-      let matchedFeature = null;
-      let matchedLayer = null;
+  if (isNaN(lat) || isNaN(lng)) {
+    alert("Ara ara~ Formatnya salah, sayang~ tulis seperti ini ya: -0.0263,109.3425 💋");
+    return;
+  }
 
-      geojsonLayer.eachLayer(layer => {
-        const polygon = layer.feature;
-        if (turf.booleanPointInPolygon(point, polygon)) {
-          matchedFeature = polygon.properties;
-          matchedLayer = layer;
-        }
-      });
+  const point = turf.point([lng, lat]);
+  let matchedFeature = null;
+  let matchedLayer = null;
 
-      if (markerLatLng) map.removeLayer(markerLatLng);
-
-      let popupContent = `
-        <div class="info">
-          <strong>Latitude:</strong> ${lat}<br>
-          <strong>Longitude:</strong> ${lng}<br><hr>
-      `;
-
-      if (matchedFeature) {
-        popupContent += `
-          <strong>RT/RW:</strong> ${matchedFeature.nmsls}<br>
-          <strong>Kelurahan:</strong> ${matchedFeature.nmdesa}<br>
-          <strong>Kecamatan:</strong> ${matchedFeature.nmkec}<br>
-          <strong>IDSLS:</strong> ${matchedFeature.idsls}
-        `;
-      } else {
-        popupContent += `<em>Lokasi tidak berada di dalam Wilkerstat Kota Pontianak.</em>`;
-      }
-
-      popupContent += `</div>`;
-
-      markerLatLng = L.marker([lat, lng]).addTo(map).bindPopup(popupContent).openPopup();
-
-      if (matchedLayer) highlightFeature(matchedLayer);
-
-      map.flyTo([lat, lng], 17, { duration: 1.5 });
+  geojsonLayer.eachLayer(layer => {
+    const polygon = layer.feature;
+    if (turf.booleanPointInPolygon(point, polygon)) {
+      matchedFeature = polygon.properties;
+      matchedLayer = layer;
     }
+  });
+
+  if (markerLatLng) map.removeLayer(markerLatLng);
+
+  let popupContent = `
+    <div class="info">
+      <strong>Latitude:</strong> ${lat}<br>
+      <strong>Longitude:</strong> ${lng}<br><hr>
+  `;
+
+  if (matchedFeature) {
+    popupContent += `
+      <strong>RT/RW:</strong> ${matchedFeature.nmsls}<br>
+      <strong>Kelurahan:</strong> ${matchedFeature.nmdesa}<br>
+      <strong>Kecamatan:</strong> ${matchedFeature.nmkec}<br>
+      <strong>IDSLS:</strong> ${matchedFeature.idsls}
+    `;
+  } else {
+    popupContent += `<em>Lokasi tidak berada di dalam Wilkerstat Kota Pontianak.</em>`;
+  }
+
+  popupContent += `</div>`;
+
+  markerLatLng = L.marker([lat, lng]).addTo(map).bindPopup(popupContent).openPopup();
+
+  if (matchedLayer) highlightFeature(matchedLayer);
+
+  map.flyTo([lat, lng], 17, { duration: 1.5 });
+}
 
     function addLegend() {
       const legend = L.control({ position: 'bottomright' });
