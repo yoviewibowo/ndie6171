@@ -178,6 +178,37 @@
       
     };
 
+    const kodePosByDesa = {
+  "BENUA MELAYU LAUT": "78123",
+  "BENUA MELAYU DARAT": "78122",
+  "PARIT TOKAYA": "78121",
+  "AKCAYA": "78121",
+  "KOTA BARU": "78121",
+  "BANGKA BELITUNG LAUT": "78124",
+  "BANGKA BELITUNG DARAT": "78124",
+  "BANSIR LAUT": "78124",
+  "BANSIR DARAT": "78124",
+  "PARIT MAYOR": "78231",
+  "BANJAR SERASAN": "78233",
+  "SAIGON": "78132",
+  "TANJUNG HULU": "78137",
+  "TANJUNG HILIR": "78236",
+  "DALAM BUGIS": "78235",
+  "TAMBELAN SAMPIT": "78234",
+  "PAL LIMA": "78114",
+  "SUNGAI JAWI DALAM": "78115",
+  "SUNGAI JAWI LUAR": "78113",
+  "SUNGAI BELIUNG": "78117",
+  "SUNGAI BANGKONG": "78116",
+  "DARAT SEKIP": "78117",
+  "TENGAH": "78111",
+  "MARIANA": "78112",
+  "SUNGAI JAWI": "78113",
+  "BATU LAYANG": "78244",
+  "SIANTAN HILIR": "78243",
+  "SIANTAN TENGAH": "78242",
+  "SIANTAN HULU": "78241"
+};
     
     const activeKecamatan = {};
 
@@ -210,13 +241,15 @@
 
     function onEachFeature(feature, layer) {
       const props = feature.properties;
+      const kodePos = kodePosByDesa[props.nmdesa] || "Mbuh ya, nyong ra mudeng";
       if (props && props.nmsls) {
         const popupContent = `
           <div class="info">
             <strong>RT/RW:</strong> ${props.nmsls}<br>
             <strong>Kelurahan:</strong> ${props.nmdesa}<br>
             <strong>Kecamatan:</strong> ${props.nmkec}<br>
-            <strong>IDSLS:</strong> ${props.idsls}
+            <strong>IDSLS:</strong> ${props.idsls}<br>
+            <strong>Kode Pos:</strong> ${kodePos}
           </div>
         `;
         layer.bindPopup(popupContent);
@@ -306,7 +339,7 @@
       matchedLayer = layer;
     }
   });
-
+ const kodePos = matchedFeature ? (kodePosByDesa[matchedFeature.nmdesa] || "Tidak diketahui") : "-";
   if (markerLatLng) map.removeLayer(markerLatLng);
 
   let popupContent = `
@@ -320,7 +353,8 @@
       <strong>RT/RW:</strong> ${matchedFeature.nmsls}<br>
       <strong>Kelurahan:</strong> ${matchedFeature.nmdesa}<br>
       <strong>Kecamatan:</strong> ${matchedFeature.nmkec}<br>
-      <strong>IDSLS:</strong> ${matchedFeature.idsls}
+      <strong>IDSLS:</strong> ${matchedFeature.idsls}<br>
+      <strong>Kode pos:</strong> ${kodePos}
     `;
   } else {
     popupContent += `<em>Lokasi tidak berada di dalam Wilkerstat Kota Pontianak.</em>`;
